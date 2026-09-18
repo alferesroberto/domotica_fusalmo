@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/sinric/:path*",
+      "destination": "/api/sinric?path=:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
