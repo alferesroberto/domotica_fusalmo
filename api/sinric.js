@@ -1,11 +1,11 @@
 export default async function handler(req, res) {
-    // Cabeceras CORS
+    // Configuración de cabeceras CORS
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader(
       'Access-Control-Allow-Headers',
-      'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, x-api-key'
+      'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, x-api-key, x-sinric-api-key'
     );
   
     if (req.method === 'OPTIONS') {
@@ -13,9 +13,8 @@ export default async function handler(req, res) {
       return;
     }
   
-    // Extraer el path
-    const { path, ...restQuery } = req.query;
-    let endpoint = Array.isArray(path) ? path.join('/') : path || '';
+    const { path } = req.query;
+    const endpoint = Array.isArray(path) ? path.join('/') : path || '';
   
     const apiKey = process.env.VITE_SINRIC_API_KEY || process.env.SINRIC_API_KEY;
   
@@ -24,12 +23,13 @@ export default async function handler(req, res) {
     }
   
     try {
-      const targetUrl = `https://api.sinric.pro/v1/${endpoint}`;
+      // RUTA CORREGIDA: Incluye /api/v1/ de acuerdo a la especificación oficial de Sinric Pro
+      const targetUrl = `https://api.sinric.pro/api/v1/${endpoint}`;
   
       const fetchOptions = {
         method: req.method,
         headers: {
-          'x-api-key': apiKey,
+          'x-sinric-api-key': apiKey, // Cabecera oficial de Sinric Pro
           'Content-Type': 'application/json',
         },
       };

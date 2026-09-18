@@ -45,59 +45,40 @@ export default function App(): React.JSX.Element {
       console.error('Error: La API Key de Sinric Pro no está configurada.');
       throw new Error('Falta API Key');
     }
-
+  
     const headers = {
-      'x-api-key': SINRIC_API_KEY,
+      'x-sinric-api-key': SINRIC_API_KEY,
       'Content-Type': 'application/json',
       ...options.headers,
     };
-
+  
     const response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
     if (!response.ok) {
       throw new Error(`Error HTTP: ${response.status}`);
     }
     return response.json();
   };
-
-  // Para consultar el estado del sensor de temperatura/humedad:
-// Para consultar los dispositivos y extraer la temperatura/humedad:
-const fetchSensorData = useCallback(async () => {
-  try {
-    setIsLoading(true);
-    
-    // Solicitamos la lista completa de dispositivos a Sinric Pro
-    const data = await sinricFetch('/devices');
-    
-    // Sinric Pro devuelve { success: true, devices: [ ... ] }
-    if (data.success && Array.isArray(data.devices)) {
-      // Buscamos el sensor por su ID
-      const tempDevice = data.devices.find(
-        (dev: any) => dev.id === DEVICE_IDS.TEMP_SENSOR
-      );
-
-      if (tempDevice) {
+  
+  const fetchSensorData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      // Endpoint oficial para obtener los datos de un dispositivo específico
+      const data = await sinricFetch(`/devices/${DEVICE_IDS.TEMP_SENSOR}`);
+      
+      if (data.success && data.device) {
         setSensorData({
-          temp: tempDevice.state?.temperature || 0,
-          hum: tempDevice.state?.humidity || 0,
+          temp: data.device.state?.temperature || 0,
+          hum: data.device.state?.humidity || 0,
         });
+        setIsConnected(true);
       }
-
-      // Opcional: Actualizar el estado del ventilador y LED según Sinric Pro
-      const fanDevice = data.devices.find((dev: any) => dev.id === DEVICE_IDS.FAN);
-      if (fanDevice) setFanState(fanDevice.state?.power === 'On');
-
-      const ledDevice = data.devices.find((dev: any) => dev.id === DEVICE_IDS.LED);
-      if (ledDevice) setLedState(ledDevice.state?.power === 'On');
-
-      setIsConnected(true);
+    } catch (error) {
+      console.error('Error de conexión:', error);
+      setIsConnected(false);
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    console.error('Error de conexión:', error);
-    setIsConnected(false);
-  } finally {
-    setIsLoading(false);
-  }
-}, []);
+  }, []);
 
   const toggleFan = async (): Promise<void> => {
     const nextState = !fanState;
