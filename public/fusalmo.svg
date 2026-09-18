@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="shieldBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="goldLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+  </defs>
+
+  <!-- Escudo Institucional -->
+  <path d="M 256 40 C 360 40 430 70 430 70 V 250 C 430 360 256 460 256 460 C 256 460 82 360 82 250 V 70 C 82 70 152 40 256 40 Z" fill="url(#shieldBg)" stroke="#dc2626" stroke-width="16" stroke-linejoin="round"/>
+
+  <!-- Rayo central (Control / Energía) -->
+  <path d="M 270 110 L 170 260 H 260 L 230 400 L 350 230 H 260 Z" fill="url(#goldLight)" stroke="#ffffff" stroke-width="6" stroke-linejoin="round"/>
+</svg>

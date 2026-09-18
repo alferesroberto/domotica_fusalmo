@@ -1,0 +1,8 @@
+{
+    "rewrites": [
+      {
+        "source": "/api/sinric/:path*",
+        "destination": "https://api.sinric.pro/v1/:path*"
+      }
+    ]
+  }
