@@ -60,17 +60,35 @@ export default function App(): React.JSX.Element {
   };
 
   // Para consultar el estado del sensor de temperatura/humedad:
+// Para consultar los dispositivos y extraer la temperatura/humedad:
 const fetchSensorData = useCallback(async () => {
   try {
     setIsLoading(true);
-    // Ruta corregida: se agrega /state al final
-    const data = await sinricFetch(`/devices/${DEVICE_IDS.TEMP_SENSOR}/state`);
     
-    if (data.success && data.state) {
-      setSensorData({
-        temp: data.state.temperature || 0,
-        hum: data.state.humidity || 0,
-      });
+    // Solicitamos la lista completa de dispositivos a Sinric Pro
+    const data = await sinricFetch('/devices');
+    
+    // Sinric Pro devuelve { success: true, devices: [ ... ] }
+    if (data.success && Array.isArray(data.devices)) {
+      // Buscamos el sensor por su ID
+      const tempDevice = data.devices.find(
+        (dev: any) => dev.id === DEVICE_IDS.TEMP_SENSOR
+      );
+
+      if (tempDevice) {
+        setSensorData({
+          temp: tempDevice.state?.temperature || 0,
+          hum: tempDevice.state?.humidity || 0,
+        });
+      }
+
+      // Opcional: Actualizar el estado del ventilador y LED según Sinric Pro
+      const fanDevice = data.devices.find((dev: any) => dev.id === DEVICE_IDS.FAN);
+      if (fanDevice) setFanState(fanDevice.state?.power === 'On');
+
+      const ledDevice = data.devices.find((dev: any) => dev.id === DEVICE_IDS.LED);
+      if (ledDevice) setLedState(ledDevice.state?.power === 'On');
+
       setIsConnected(true);
     }
   } catch (error) {
