@@ -86,54 +86,45 @@ export default function App(): React.JSX.Element {
   };
 
   // Extrae temperatura y humedad probando las distintas estructuras de Sinric Pro
-  const extractSensorValue = (data: any): SensorData => {
-    if (!data) return { temp: 0, hum: 0 };
+  // Extrae la temperatura y humedad directamente de la estructura de Sinric Pro
+const extractSensorValue = (data: any): SensorData => {
+  if (!data) return { temp: 0, hum: 0 };
 
-    const device = data.device || data;
-    const state = device.state || {};
+  // El objeto del dispositivo puede venir dentro de data.device o directamente en data
+  const device = data.device || data;
 
-    // Estructura 1: Directa en state (ej: state.temperature)
-    let temp = state.temperature;
-    let hum = state.humidity;
+  // Extraer temperatura y humedad de las claves de la raíz
+  const temp = device.temperature ?? device.state?.temperature ?? 0;
+  const hum = device.humidity ?? device.state?.humidity ?? 0;
 
-    // Estructura 2: Dentro del objeto state.temperatures (común en Sinric Pro)
-    if (temp === undefined && state.temperatures) {
-      temp = state.temperatures.temperature;
-      hum = state.temperatures.humidity;
-    }
-
-    // Estructura 3: Raíz de la respuesta
-    if (temp === undefined && data.temperature !== undefined) {
-      temp = data.temperature;
-      hum = data.humidity;
-    }
-
-    return {
-      temp: typeof temp === 'number' ? temp : parseFloat(temp) || 0,
-      hum: typeof hum === 'number' ? hum : parseFloat(hum) || 0,
-    };
+  return {
+    temp: typeof temp === 'number' ? temp : parseFloat(temp) || 0,
+    hum: typeof hum === 'number' ? hum : parseFloat(hum) || 0,
   };
+};
   
-  const fetchSensorData = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const data = await sinricFetch(`/devices/${DEVICE_IDS.TEMP_SENSOR}`);
-      
-      addLog('response', 'Respuesta del Sensor recibida:', data);
+const fetchSensorData = useCallback(async () => {
+  try {
+    setIsLoading(true);
+    const data = await sinricFetch(`/devices/${DEVICE_IDS.TEMP_SENSOR}`);
+    
+    addLog('response', 'Respuesta del Sensor recibida:', data);
 
-      if (data.success || data.device) {
-        const parsed = extractSensorValue(data);
-        setSensorData(parsed);
-        setIsConnected(true);
-      }
-    } catch (error: any) {
-      addLog('error', 'Falló la consulta del sensor:', error.message);
-      setIsConnected(false);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    // Con la respuesta de Sinric Pro actualizamos los valores y el estado de conexión
+    const parsed = extractSensorValue(data);
+    setSensorData(parsed);
 
+    // Verificar si el dispositivo responde o si está en línea
+    const deviceObj = data.device || data;
+    setIsConnected(deviceObj.isOnline ?? true);
+    
+  } catch (error: any) {
+    addLog('error', 'Falló la consulta del sensor:', error.message);
+    setIsConnected(false);
+  } finally {
+    setIsLoading(false);
+  }
+}, []);
   const toggleFan = async (): Promise<void> => {
     const nextState = !fanState;
     try {
