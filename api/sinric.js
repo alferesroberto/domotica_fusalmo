@@ -13,9 +13,20 @@ export default async function handler(req, res) {
       return;
     }
   
+    // Capturar el path limpiando posibles caracteres o query params
     const { path } = req.query;
-    const endpoint = Array.isArray(path) ? path.join('/') : path || '';
+    let endpoint = '';
   
+    if (Array.isArray(path)) {
+      endpoint = path.join('/');
+    } else if (typeof path === 'string') {
+      endpoint = path;
+    }
+  
+    // Limpiar cualquier caracter no deseado o corchete al final
+    endpoint = endpoint.replace(/[\]\[]/g, '').trim();
+  
+    // Obtener la API Key desde Vercel
     const apiKey = process.env.VITE_SINRIC_API_KEY || process.env.SINRIC_API_KEY;
   
     if (!apiKey) {
@@ -23,21 +34,39 @@ export default async function handler(req, res) {
     }
   
     try {
-      // RUTA CORREGIDA: Incluye /api/v1/ de acuerdo a la especificación oficial de Sinric Pro
+      // URL limpia de Sinric Pro API v1
       const targetUrl = `https://api.sinric.pro/api/v1/${endpoint}`;
   
       const fetchOptions = {
         method: req.method,
         headers: {
-          'x-sinric-api-key': apiKey, // Cabecera oficial de Sinric Pro
+          'x-sinric-api-key': apiKey,
           'Content-Type': 'application/json',
         },
       };
   
+      // Procesar el cuerpo (body) de las peticiones POST / PUT
       if (req.method !== 'GET' && req.method !== 'HEAD' && req.body) {
-        fetchOptions.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+        let payload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+  
+        // Transformación automática para evitar el error 422 en Sinric Pro:
+        // Sinric Pro requiere que las peticiones de acción tengan type: "request"
+        // y que "value" sea una cadena JSON (JSON stringified).
+        if (endpoint.includes('/action')) {
+          const actionType = payload.action || 'setPowerState';
+          const rawValue = payload.value || {};
+  
+          payload = {
+            type: 'request',
+            action: actionType,
+            value: typeof rawValue === 'object' ? JSON.stringify(rawValue) : rawValue,
+          };
+        }
+  
+        fetchOptions.body = JSON.stringify(payload);
       }
   
+      // Realizar la Petición a Sinric Pro
       const response = await fetch(targetUrl, fetchOptions);
       const responseText = await response.text();
   
@@ -53,6 +82,6 @@ export default async function handler(req, res) {
   
       return res.status(response.status).json(data);
     } catch (error) {
-      return res.status(500).json({ error: 'Error interno en Vercel', details: error.message });
+      return res.status(500).json({ error: 'Error interno en la Serverless Function', details: error.message });
     }
   }
