@@ -1,5 +1,4 @@
 export default async function handler(req, res) {
-    // Configuración de cabeceras CORS
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -13,19 +12,15 @@ export default async function handler(req, res) {
       return;
     }
   
-    // Obtener la ruta enviada en la query
     const { path } = req.query;
     const endpoint = Array.isArray(path) ? path.join('/') : path || '';
-  
-    // API Key cargada desde Vercel
     const apiKey = process.env.VITE_SINRIC_API_KEY || process.env.SINRIC_API_KEY;
   
     if (!apiKey) {
-      return res.status(500).json({ error: 'La API Key no está configurada en las variables de entorno de Vercel' });
+      return res.status(500).json({ error: 'La API Key no está configurada en Vercel' });
     }
   
     try {
-      // Construcción de la URL de Sinric Pro
       const targetUrl = `https://api.sinric.pro/v1/${endpoint}`;
   
       const fetchOptions = {
@@ -33,7 +28,6 @@ export default async function handler(req, res) {
         headers: {
           'x-api-key': apiKey,
           'Content-Type': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' // Evita bloqueos por User-Agent vacío
         },
       };
   
@@ -44,20 +38,18 @@ export default async function handler(req, res) {
       const response = await fetch(targetUrl, fetchOptions);
       const responseText = await response.text();
   
-      // Intentar convertir la respuesta a JSON
       let data;
       try {
         data = JSON.parse(responseText);
       } catch {
-        // Si Sinric Pro devuelve HTML o texto plano, devolverlo en el detalle para diagnosticar
         return res.status(response.status).json({
-          error: `Sinric Pro respondió con estado HTTP ${response.status} (no JSON)`,
-          rawResponse: responseText
+          error: `Sinric Pro respondió con estado HTTP ${response.status}`,
+          rawResponse: responseText,
         });
       }
   
       return res.status(response.status).json(data);
     } catch (error) {
-      return res.status(500).json({ error: 'Error interno en la Serverless Function', details: error.message });
+      return res.status(500).json({ error: 'Error interno en Vercel', details: error.message });
     }
   }

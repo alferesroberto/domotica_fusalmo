@@ -59,24 +59,27 @@ export default function App(): React.JSX.Element {
     return response.json();
   };
 
-  const fetchSensorData = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const data = await sinricFetch(`/devices/${DEVICE_IDS.TEMP_SENSOR}`);
-      if (data.success && data.device) {
-        setSensorData({
-          temp: data.device.temperature || 0,
-          hum: data.device.humidity || 0,
-        });
-        setIsConnected(true);
-      }
-    } catch (error) {
-      console.error('Error de conexión:', error);
-      setIsConnected(false);
-    } finally {
-      setIsLoading(false);
+  // Para consultar el estado del sensor de temperatura/humedad:
+const fetchSensorData = useCallback(async () => {
+  try {
+    setIsLoading(true);
+    // Ruta corregida: se agrega /state al final
+    const data = await sinricFetch(`/devices/${DEVICE_IDS.TEMP_SENSOR}/state`);
+    
+    if (data.success && data.state) {
+      setSensorData({
+        temp: data.state.temperature || 0,
+        hum: data.state.humidity || 0,
+      });
+      setIsConnected(true);
     }
-  }, []);
+  } catch (error) {
+    console.error('Error de conexión:', error);
+    setIsConnected(false);
+  } finally {
+    setIsLoading(false);
+  }
+}, []);
 
   const toggleFan = async (): Promise<void> => {
     const nextState = !fanState;
