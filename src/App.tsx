@@ -11,13 +11,14 @@ import {
   Activity,
   ShieldCheck,
   Power,
-  RefreshCw
+  RefreshCw,
+  Terminal,
+  Trash2
 } from 'lucide-react';
 
 // ================= CONFIGURACIÓN SEGURA =================
-// Vite requiere el prefijo VITE_ para exponer variables de entorno en el frontend
 const SINRIC_API_KEY = import.meta.env.VITE_SINRIC_API_KEY;
-const BASE_URL = '/api/sinric'; // Vercel redirigirá esto a https://api.sinric.pro/v1
+const BASE_URL = '/api/sinric';
 
 const DEVICE_IDS = {
   FAN: '6aa41651b597c4e1234320e9',
@@ -31,6 +32,14 @@ interface SensorData {
   hum: number;
 }
 
+interface LogEntry {
+  id: string;
+  timestamp: string;
+  type: 'info' | 'error' | 'response';
+  message: string;
+  data?: any;
+}
+
 export default function App(): React.JSX.Element {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -40,9 +49,23 @@ export default function App(): React.JSX.Element {
   const [ledState, setLedState] = useState<boolean>(false);
   const [blindPos, setBlindPos] = useState<number>(0);
 
+  // Estado para la Consola de Logs
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+
+  const addLog = (type: 'info' | 'error' | 'response', message: string, data?: any) => {
+    const newEntry: LogEntry = {
+      id: Math.random().toString(36).substring(2, 9),
+      timestamp: new Date().toLocaleTimeString(),
+      type,
+      message,
+      data
+    };
+    setLogs((prev) => [newEntry, ...prev.slice(0, 19)]); // Guardar los últimos 20 logs
+  };
+
   const sinricFetch = async (endpoint: string, options: RequestInit = {}) => {
     if (!SINRIC_API_KEY) {
-      console.error('Error: La API Key de Sinric Pro no está configurada.');
+      addLog('error', 'Falta VITE_SINRIC_API_KEY en variables de entorno');
       throw new Error('Falta API Key');
     }
   
@@ -52,28 +75,59 @@ export default function App(): React.JSX.Element {
       ...options.headers,
     };
   
+    addLog('info', `HTTP ${options.method || 'GET'} -> ${endpoint}`);
     const response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
+    
     if (!response.ok) {
+      addLog('error', `Error HTTP: ${response.status} en ${endpoint}`);
       throw new Error(`Error HTTP: ${response.status}`);
     }
     return response.json();
+  };
+
+  // Extrae temperatura y humedad probando las distintas estructuras de Sinric Pro
+  const extractSensorValue = (data: any): SensorData => {
+    if (!data) return { temp: 0, hum: 0 };
+
+    const device = data.device || data;
+    const state = device.state || {};
+
+    // Estructura 1: Directa en state (ej: state.temperature)
+    let temp = state.temperature;
+    let hum = state.humidity;
+
+    // Estructura 2: Dentro del objeto state.temperatures (común en Sinric Pro)
+    if (temp === undefined && state.temperatures) {
+      temp = state.temperatures.temperature;
+      hum = state.temperatures.humidity;
+    }
+
+    // Estructura 3: Raíz de la respuesta
+    if (temp === undefined && data.temperature !== undefined) {
+      temp = data.temperature;
+      hum = data.humidity;
+    }
+
+    return {
+      temp: typeof temp === 'number' ? temp : parseFloat(temp) || 0,
+      hum: typeof hum === 'number' ? hum : parseFloat(hum) || 0,
+    };
   };
   
   const fetchSensorData = useCallback(async () => {
     try {
       setIsLoading(true);
-      // Endpoint oficial para obtener los datos de un dispositivo específico
       const data = await sinricFetch(`/devices/${DEVICE_IDS.TEMP_SENSOR}`);
       
-      if (data.success && data.device) {
-        setSensorData({
-          temp: data.device.state?.temperature || 0,
-          hum: data.device.state?.humidity || 0,
-        });
+      addLog('response', 'Respuesta del Sensor recibida:', data);
+
+      if (data.success || data.device) {
+        const parsed = extractSensorValue(data);
+        setSensorData(parsed);
         setIsConnected(true);
       }
-    } catch (error) {
-      console.error('Error de conexión:', error);
+    } catch (error: any) {
+      addLog('error', 'Falló la consulta del sensor:', error.message);
       setIsConnected(false);
     } finally {
       setIsLoading(false);
@@ -91,8 +145,9 @@ export default function App(): React.JSX.Element {
         }),
       });
       setFanState(nextState);
-    } catch (error) {
-      console.error('Error ventilador:', error);
+      addLog('info', `Ventilador -> ${nextState ? 'ENCENDIDO' : 'APAGADO'}`);
+    } catch (error: any) {
+      addLog('error', 'Error al cambiar ventilador:', error.message);
     }
   };
 
@@ -107,8 +162,9 @@ export default function App(): React.JSX.Element {
         }),
       });
       setLedState(nextState);
-    } catch (error) {
-      console.error('Error LED:', error);
+      addLog('info', `Tira LED -> ${nextState ? 'ENCENDIDA' : 'APAGADA'}`);
+    } catch (error: any) {
+      addLog('error', 'Error al cambiar LED:', error.message);
     }
   };
 
@@ -125,8 +181,9 @@ export default function App(): React.JSX.Element {
           value: { rangeValue: blindPos },
         }),
       });
-    } catch (error) {
-      console.error('Error persiana:', error);
+      addLog('info', `Persiana ajustada a: ${blindPos}%`);
+    } catch (error: any) {
+      addLog('error', 'Error al mover persiana:', error.message);
     }
   };
 
@@ -157,7 +214,7 @@ export default function App(): React.JSX.Element {
                 <span className="px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-400 rounded-full border border-amber-500/20">
                   FUSALMO • DON BOSCO
                 </span>
-                <span className="text-[10px] text-slate-500 font-mono">v4.5 Vercel Secure</span>
+                <span className="text-[10px] text-slate-500 font-mono">v4.6 Sensor Debugger</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white mt-0.5">
                 Centro de Control Domótico
@@ -189,6 +246,7 @@ export default function App(): React.JSX.Element {
           </div>
         </header>
 
+        {/* Tarjetas de Control */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Termostato */}
           <div className="bg-slate-900/40 backdrop-blur-md p-6 rounded-3xl border border-slate-800/80 shadow-xl flex flex-col justify-between group">
@@ -299,6 +357,49 @@ export default function App(): React.JSX.Element {
               <span>CERRADO (0%)</span>
               <span>ABIERTO (100%)</span>
             </div>
+          </div>
+        </div>
+
+        {/* Consola de Depuración en Tiempo Real */}
+        <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 shadow-2xl font-mono text-xs">
+          <div className="flex justify-between items-center pb-4 mb-4 border-b border-slate-800">
+            <div className="flex items-center space-x-2 text-cyan-400">
+              <Terminal className="w-4 h-4" />
+              <span className="font-bold uppercase tracking-wider">Consola de Eventos y Respuestas Sensor</span>
+            </div>
+            <button 
+              onClick={() => setLogs([])}
+              className="flex items-center space-x-1 px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-rose-400 rounded-xl transition-colors cursor-pointer text-[11px]"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Limpiar Consola</span>
+            </button>
+          </div>
+
+          <div className="space-y-3 max-h-60 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-800">
+            {logs.length === 0 ? (
+              <p className="text-slate-600 italic">Esperando respuestas o acciones del usuario...</p>
+            ) : (
+              logs.map((log) => (
+                <div key={log.id} className="border-b border-slate-800/50 pb-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-slate-500 font-bold">{log.timestamp}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      log.type === 'error' ? 'bg-rose-500/20 text-rose-400' :
+                      log.type === 'response' ? 'bg-cyan-500/20 text-cyan-300' : 'bg-slate-800 text-slate-300'
+                    }`}>
+                      {log.type}
+                    </span>
+                    <span className="text-slate-300 font-sans">{log.message}</span>
+                  </div>
+                  {log.data && (
+                    <pre className="mt-1 p-2 bg-slate-950/80 rounded-xl text-emerald-400 overflow-x-auto text-[11px]">
+                      {JSON.stringify(log.data, null, 2)}
+                    </pre>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
 
